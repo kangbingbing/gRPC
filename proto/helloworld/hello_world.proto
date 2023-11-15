@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package helloworld;
+
+option go_package="github.com/kangbingbing/grpc/proto/helloworld";
+
+// 导入google/api/annotations.proto
+import "google/api/annotations.proto";
+
+// 定义一个Grpc服务
+service Grpc {
+  // 打招呼方法
+  rpc SayHello (HelloRequest) returns (HelloReply) {
+    // 这里添加了google.api.http注释
+    option (google.api.http) = {
+      post: "/v1/grpc/sayhello"
+      body: "*"
+    };
+  }
+}
+
+// 定义请求的message
+message HelloRequest {
+  string token = 1;
+  int32 value = 2;
+  string add = 3;
+  int32 hour = 4;
+}
+
+// 定义响应的message
+message HelloReply {
+  int32 code = 1;
+  string hash = 2;
+}
