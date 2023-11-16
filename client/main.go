@@ -14,8 +14,27 @@ const (
 	address = "0.0.0.0:50051"
 )
 
+type Token struct {
+	AppID     string
+	AppSecret string
+}
+
+// RequireTransportSecurity implements credentials.PerRPCCredentials.
+func (*Token) RequireTransportSecurity() bool {
+	return false
+}
+
+// GetRequestMetadata 获取当前请求认证所需的元数据
+func (t *Token) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{"App-ID": t.AppID, "App-Secret": t.AppSecret}, nil
+}
+
 func main() {
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	token := Token{
+		AppID:     "1234567890",
+		AppSecret: "GRPC-TOKEN",
+	}
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithPerRPCCredentials(&token))
 	if err != nil {
 		panic(err)
 	}

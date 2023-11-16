@@ -13,7 +13,10 @@ import (
 	pb "grpc/proto/helloworld"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var port = flag.Int("port", 50051, "the port to serve on")
@@ -24,7 +27,34 @@ type server struct {
 }
 
 func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+	token, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "无Token认证信息")
+	}
+	var (
+		App_ID     string
+		App_Secret string
+	)
+	if val, ok := token["app-id"]; ok {
+		App_ID = val[0]
+	}
+	if val, ok := token["app-secret"]; ok {
+		App_Secret = val[0]
+	}
+
+	log.Printf("metadata: %v, App_Secret=%s, App_ID=%s", token, App_Secret, App_ID)
 	return &pb.HelloReply{Code: 200, Hash: "hash" + in.Add}, nil
+}
+
+func CustomMatcher(key string) (string, bool) {
+	switch key {
+	case "App-Id":
+		return key, true
+	case "App-Secret":
+		return key, true
+	default:
+		return runtime.DefaultHeaderMatcher(key)
+	}
 }
 
 func main() {
@@ -52,7 +82,8 @@ func main() {
 		log.Fatalln("Failed to dial server:", err)
 	}
 
-	gwmux := runtime.NewServeMux()
+	// 3 自定义 HTTP headers 规则
+	gwmux := runtime.NewServeMux(runtime.WithIncomingHeaderMatcher(CustomMatcher))
 	// Register Grpc
 	err = pb.RegisterGrpcHandler(context.Background(), gwmux, conn)
 	if err != nil {
