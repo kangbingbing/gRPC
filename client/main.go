@@ -40,7 +40,7 @@ func main() {
 	}
 	defer conn.Close()
 	c := pb.NewGrpcClient(conn)
-	r, err := c.SayHello(context.Background(), &pb.HelloRequest{Token: "123", Add: "TDsasd", Hour: 1, Value: 33000})
+	r, err := c.SayHello(context.Background(), &pb.HelloRequest{Add: "TDsasd", Hour: 1, Value: 33000})
 	if err != nil {
 		log.Fatalf("could not greet: %v", err)
 	}

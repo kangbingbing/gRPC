@@ -27,26 +27,11 @@ type server struct {
 }
 
 func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
-	token, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Errorf(codes.Unauthenticated, "无Token认证信息")
-	}
-	var (
-		App_ID     string
-		App_Secret string
-	)
-	if val, ok := token["app-id"]; ok {
-		App_ID = val[0]
-	}
-	if val, ok := token["app-secret"]; ok {
-		App_Secret = val[0]
-	}
-
-	log.Printf("metadata: %v, App_Secret=%s, App_ID=%s", token, App_Secret, App_ID)
+	log.Printf("ADD=%s, \nHour=%d, \nValue=%d", in.Add, in.Hour, in.Value)
 	return &pb.HelloReply{Code: 200, Hash: "hash" + in.Add}, nil
 }
 
-func CustomMatcher(key string) (string, bool) {
+func CustomHeaderMatcher(key string) (string, bool) {
 	switch key {
 	case "App-Id":
 		return key, true
@@ -57,9 +42,35 @@ func CustomMatcher(key string) (string, bool) {
 	}
 }
 
+func middleware(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	log.Println("进入拦截器验证")
+	token, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		log.Println("无Token认证信息")
+		return nil, status.Errorf(codes.Unauthenticated, "无Token认证信息")
+	}
+	var (
+		AppID     string
+		AppSecret string
+	)
+	if val, ok := token["app-id"]; ok {
+		AppID = val[0]
+	}
+	if val, ok := token["app-secret"]; ok {
+		AppSecret = val[0]
+	}
+	log.Printf("metadata: %v \nAppSecret=%s, \nAppID=%s", token, AppSecret, AppID)
+	if len(AppSecret) == 0 || len(AppID) == 0 {
+		log.Println("AppID或AppSecret验证失败")
+		return nil, status.Errorf(codes.Unauthenticated, "AppID 或 AppSecret 验证失败")
+	}
+	log.Println("验证成功, 进入下一步")
+	return handler(ctx, req)
+}
+
 func main() {
 	// Create a gRPC server object
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.UnaryInterceptor(middleware))
 	// Attach the Grpc service to the server
 	pb.RegisterGrpcServer(s, &server{})
 	// Serve gRPC Server
@@ -83,7 +94,7 @@ func main() {
 	}
 
 	// 3 自定义 HTTP headers 规则
-	gwmux := runtime.NewServeMux(runtime.WithIncomingHeaderMatcher(CustomMatcher))
+	gwmux := runtime.NewServeMux(runtime.WithIncomingHeaderMatcher(CustomHeaderMatcher))
 	// Register Grpc
 	err = pb.RegisterGrpcHandler(context.Background(), gwmux, conn)
 	if err != nil {
